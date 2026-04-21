@@ -139,6 +139,16 @@ def export(
             f.write("\n".join(lines))
         console.print(f"[green]✓ Exported to {out_path}[/green]")
 
+@app.command()
+def today():
+    init_db()
+    rows = search_entries(today=True)
+    if not rows:
+        console.print("[yellow]No entries today.[/yellow]")
+        return
+    console.print(f"[cyan]Today's entries:[/cyan]")
+    _print_table(rows)
+
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("ID", width=4)
