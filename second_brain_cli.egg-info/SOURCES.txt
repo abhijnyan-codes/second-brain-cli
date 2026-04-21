@@ -1,0 +1,13 @@
+LICENSE
+README.md
+setup.py
+brain/__init__.py
+brain/cli.py
+brain/db.py
+brain/search.py
+second_brain_cli.egg-info/PKG-INFO
+second_brain_cli.egg-info/SOURCES.txt
+second_brain_cli.egg-info/dependency_links.txt
+second_brain_cli.egg-info/entry_points.txt
+second_brain_cli.egg-info/requires.txt
+second_brain_cli.egg-info/top_level.txt
