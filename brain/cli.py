@@ -62,6 +62,7 @@ def delete(id: int = typer.Argument(..., help="ID of entry to delete")):
     conn.commit()
     conn.close()
     console.print(f"[red]Deleted entry {id}[/red]")
+
 @app.command()
 def edit(id: int = typer.Argument(..., help="ID of entry to edit")):
     init_db()
@@ -93,7 +94,51 @@ def edit(id: int = typer.Argument(..., help="ID of entry to edit")):
     conn.commit()
     conn.close()
     console.print(f"[green]✓ Entry {id} updated![/green]")
-    
+
+@app.command()
+def export(
+    format: str = typer.Option("markdown", "--format", "-f", help="markdown | json")
+):
+    init_db()
+    rows = search_entries()
+    if not rows:
+        console.print("[yellow]No entries to export.[/yellow]")
+        return
+
+    import json, os
+    output_dir = os.path.expanduser("~/.second-brain")
+
+    if format == "json":
+        data = []
+        for row in rows:
+            id_, content, type_, language, tags, created_at = row
+            data.append({
+                "id": id_,
+                "content": content,
+                "type": type_,
+                "language": language,
+                "tags": tags,
+                "created_at": created_at
+            })
+        out_path = os.path.join(output_dir, "export.json")
+        with open(out_path, "w") as f:
+            json.dump(data, f, indent=2)
+        console.print(f"[green]✓ Exported to {out_path}[/green]")
+
+    else:
+        lines = ["# Second Brain Export\n"]
+        for row in rows:
+            id_, content, type_, language, tags, created_at = row
+            lines.append(f"## [{id_}] {type_.upper()}")
+            lines.append(f"**Tags:** {tags or '-'}")
+            lines.append(f"**Created:** {created_at}")
+            lines.append(f"\n{content}\n")
+            lines.append("---\n")
+        out_path = os.path.join(output_dir, "export.md")
+        with open(out_path, "w") as f:
+            f.write("\n".join(lines))
+        console.print(f"[green]✓ Exported to {out_path}[/green]")
+
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("ID", width=4)
