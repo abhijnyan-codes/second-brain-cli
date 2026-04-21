@@ -62,7 +62,38 @@ def delete(id: int = typer.Argument(..., help="ID of entry to delete")):
     conn.commit()
     conn.close()
     console.print(f"[red]Deleted entry {id}[/red]")
+@app.command()
+def edit(id: int = typer.Argument(..., help="ID of entry to edit")):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM entries WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        console.print(f"[red]No entry found with ID {id}[/red]")
+        conn.close()
+        return
 
+    import tempfile, subprocess, os
+    id_, content, type_, language, tags, created_at = row
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        f.write(content)
+        tmp_path = f.name
+
+    editor = os.environ.get("EDITOR", "notepad")
+    subprocess.call([editor, tmp_path])
+
+    with open(tmp_path, 'r') as f:
+        new_content = f.read().strip()
+
+    os.unlink(tmp_path)
+
+    cursor.execute("UPDATE entries SET content = ? WHERE id = ?", (new_content, id))
+    conn.commit()
+    conn.close()
+    console.print(f"[green]✓ Entry {id} updated![/green]")
+    
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("ID", width=4)
