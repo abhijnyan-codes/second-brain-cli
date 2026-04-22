@@ -151,14 +151,40 @@ def today():
 
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
+
+    table.add_column("Score", width=8) 
     table.add_column("ID", width=4)
     table.add_column("Content", width=50)
     table.add_column("Type", width=8)
     table.add_column("Lang", width=8)
     table.add_column("Tags", width=15)
     table.add_column("Created", width=20)
-    for row in rows:
-        table.add_row(*[str(x) for x in format_row(row)])
+
+    for item in rows:
+        if isinstance(item, tuple) and len(item) == 2:
+            score, row = item
+            id_, content, type_, language, tags, created_at = row
+            table.add_row(
+                str(score),
+                str(id_),
+                content,
+                type_ or "-",
+                language or "-",
+                tags or "-",
+                created_at
+            )
+        else:
+            id_, content, type_, language, tags, created_at = item
+            table.add_row(
+                "-",
+                str(id_),
+                content,
+                type_ or "-",
+                language or "-",
+                tags or "-",
+                created_at
+            )
+
     console.print(table)
 
 if __name__ == "__main__":
