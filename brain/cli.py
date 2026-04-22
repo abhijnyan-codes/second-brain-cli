@@ -9,8 +9,9 @@ app = typer.Typer()
 console = Console()
 
 def format_row(row):
-    id_, content, type_, language, tags, created_at = row
-    return id_, content, type_ or "-", language or "-", tags or "-", created_at
+    id_, content, type_, language, tags, created_at, pinned = row
+    pin_marker = "📌" if pinned else ""
+    return id_, content, type_ or "-", language or "-", tags or "-", created_at, pin_marker
 
 @app.command()
 def add(
@@ -149,10 +150,45 @@ def today():
     console.print(f"[cyan]Today's entries:[/cyan]")
     _print_table(rows)
 
+@app.command()
+def pin(id: int = typer.Argument(..., help="ID of entry to pin/unpin")):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT pinned FROM entries WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        console.print(f"[red]No entry found with ID {id}[/red]")
+        conn.close()
+        return
+    new_pinned = 0 if row[0] == 1 else 1
+    cursor.execute("UPDATE entries SET pinned = ? WHERE id = ?", (new_pinned, id))
+    conn.commit()
+    conn.close()
+    if new_pinned:
+        console.print(f"[cyan]📌 Entry {id} pinned![/cyan]")
+    else:
+        console.print(f"[yellow]📌 Entry {id} unpinned.[/yellow]")
+
+@app.command()
+def copy(id: int = typer.Argument(..., help="ID of entry to copy to clipboard")):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT content FROM entries WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        console.print(f"[red]No entry found with ID {id}[/red]")
+        conn.close()
+        return
+    import pyperclip
+    pyperclip.copy(row[0])
+    conn.close()
+    console.print(f"[green]✓ Copied to clipboard![/green]")
+
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
-
-    table.add_column("Score", width=8) 
+    table.add_column("Pin", width=4)
     table.add_column("ID", width=4)
     table.add_column("Content", width=50)
     table.add_column("Type", width=8)
@@ -161,29 +197,15 @@ def _print_table(rows):
     table.add_column("Created", width=20)
 
     for item in rows:
-        if isinstance(item, tuple) and len(item) == 2:
+        if isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], tuple):
             score, row = item
-            id_, content, type_, language, tags, created_at = row
-            table.add_row(
-                str(score),
-                str(id_),
-                content,
-                type_ or "-",
-                language or "-",
-                tags or "-",
-                created_at
-            )
+            id_, content, type_, language, tags, created_at, pinned = row
+            pin_marker = "📌" if pinned else ""
+            table.add_row(pin_marker, str(id_), content, type_ or "-", language or "-", tags or "-", created_at)
         else:
-            id_, content, type_, language, tags, created_at = item
-            table.add_row(
-                "-",
-                str(id_),
-                content,
-                type_ or "-",
-                language or "-",
-                tags or "-",
-                created_at
-            )
+            id_, content, type_, language, tags, created_at, pinned = item
+            pin_marker = "📌" if pinned else ""
+            table.add_row(pin_marker, str(id_), content, type_ or "-", language or "-", tags or "-", created_at)
 
     console.print(table)
 

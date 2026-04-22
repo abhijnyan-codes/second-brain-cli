@@ -28,38 +28,31 @@ def search_entries(keyword=None, tag=None, entry_type=None, today=False):
         query += " AND created_at LIKE ?"
         params.append(f"{today_date}%")
 
+    query += " ORDER BY pinned DESC, created_at DESC"
+
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
 
-    # 🔥 NEW: scoring system
     if keyword:
         scored = []
         for row in rows:
-            id, content, type_, language, tags, created_at = row
+            id_, content, type_, language, tags, created_at, pinned = row
             score = 0
 
             content_lower = content.lower()
             keyword_lower = keyword.lower()
             tags_lower = tags.lower() if tags else ""
 
-            # Exact match
             if keyword_lower in content_lower:
                 score += 50
-
-            # Word match
             for word in keyword_lower.split():
                 if word in content_lower:
                     score += 10
-
-            # Tag boost
             if keyword_lower in tags_lower:
                 score += 30
-
-            # Fuzzy match
             score += fuzz.partial_ratio(keyword_lower, content_lower) // 5
 
-            # Recent boost
             try:
                 created = datetime.fromisoformat(created_at)
                 days_old = (datetime.now() - created).days
@@ -68,11 +61,12 @@ def search_entries(keyword=None, tag=None, entry_type=None, today=False):
             except:
                 pass
 
+            if pinned:
+                score += 100
+
             scored.append((score, row))
 
-        # sort by score
         scored.sort(reverse=True, key=lambda x: x[0])
-
-        return scored  # return score + row
+        return scored
 
     return rows

@@ -19,8 +19,14 @@ def init_db():
             type TEXT DEFAULT 'note',
             language TEXT,
             tags TEXT,
-            created_at TEXT
+            created_at TEXT,
+            pinned INTEGER DEFAULT 0
         )
     ''')
+    # add pinned column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE entries ADD COLUMN pinned INTEGER DEFAULT 0")
+    except:
+        pass
     conn.commit()
     conn.close()

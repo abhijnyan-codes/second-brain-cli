@@ -1,3 +1,4 @@
 typer
 rich
 rapidfuzz
+pyperclip
