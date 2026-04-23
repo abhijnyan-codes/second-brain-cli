@@ -1,4 +1,5 @@
 typer
 rich
-pyperclip
 rapidfuzz
+pyperclip
+requests
