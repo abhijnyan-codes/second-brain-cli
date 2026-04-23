@@ -2,3 +2,4 @@ typer
 rich
 rapidfuzz
 pyperclip
+requests

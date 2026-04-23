@@ -1,9 +1,11 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 
 DB_DIR = os.path.expanduser("~/.second-brain")
 DB_PATH = os.path.join(DB_DIR, "brain.db")
+CONFIG_PATH = os.path.join(DB_DIR, "config.json")
 
 def get_connection():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -23,10 +25,22 @@ def init_db():
             pinned INTEGER DEFAULT 0
         )
     ''')
-    # add pinned column if it doesn't exist (for existing databases)
     try:
         cursor.execute("ALTER TABLE entries ADD COLUMN pinned INTEGER DEFAULT 0")
     except:
         pass
     conn.commit()
     conn.close()
+
+def get_config():
+    if not os.path.exists(CONFIG_PATH):
+        return {}
+    with open(CONFIG_PATH, "r") as f:
+        return json.load(f)
+
+def set_config(key, value):
+    config = get_config()
+    config[key] = value
+    os.makedirs(DB_DIR, exist_ok=True)
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config, f, indent=2)

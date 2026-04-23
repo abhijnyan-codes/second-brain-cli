@@ -6,6 +6,7 @@ from rich.table import Table
 from datetime import datetime
 from brain.db import init_db, get_connection
 from brain.search import search_entries
+from brain.db import init_db, get_connection, get_config, set_config
 
 app = typer.Typer()
 console = Console()
@@ -28,6 +29,22 @@ def add(
     cursor.execute(
         "INSERT INTO entries (content, type, language, tags, created_at) VALUES (?, ?, ?, ?, ?)",
         (content, type_, language, tag, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+    console.print(f"[green]✓ Saved![/green]")
+
+@app.command()
+def say(
+    content: str = typer.Argument(..., help="Quick note to save"),
+    tag: str = typer.Option(None, "--tag", "-t", help="Comma separated tags")
+):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO entries (content, type, language, tags, created_at, pinned) VALUES (?, ?, ?, ?, ?, ?)",
+        (content, "note", None, tag, datetime.now().isoformat(), 0)
     )
     conn.commit()
     conn.close()
@@ -153,6 +170,22 @@ def today():
     _print_table(rows)
 
 @app.command()
+def config(
+    set: str = typer.Option(None, "--set", help="Config key to set"),
+    value: str = typer.Option(None, "--value", help="Value to set")
+):
+    if set and value:
+        set_config(set, value)
+        console.print(f"[green]✓ Config saved: {set} = {value}[/green]")
+    else:
+        cfg = get_config()
+        if not cfg:
+            console.print("[yellow]No config found.[/yellow]")
+            return
+        for k, v in cfg.items():
+            console.print(f"[cyan]{k}[/cyan] = {v}")
+
+@app.command()
 def pin(id: int = typer.Argument(..., help="ID of entry to pin/unpin")):
     init_db()
     conn = get_connection()
@@ -189,54 +222,98 @@ def copy(id: int = typer.Argument(..., help="ID of entry to copy to clipboard"))
     console.print(f"[green]✓ Copied to clipboard![/green]")
 
 @app.command()
-def share(
-    id: int = typer.Argument(..., help="ID of entry to share"),
-    offline: bool = typer.Option(True, "--offline", help="Generate offline share code")
+def send(
+    ids: list[int] = typer.Argument(..., help="IDs of entries to send")
 ):
     init_db()
+    config = get_config()
+    token = config.get("github_token")
+    if not token:
+        console.print("[red]GitHub token not set. Run: brain config --set github_token --value YOUR_TOKEN[/red]")
+        return
+
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM entries WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    if not row:
-        console.print(f"[red]No entry found with ID {id}[/red]")
-        conn.close()
-        return
-    id_, content, type_, language, tags, created_at, pinned = row
-    data = {
-        "content": content,
-        "type": type_,
-        "language": language,
-        "tags": tags
-    }
-    encoded = base64.b64encode(json.dumps(data).encode()).decode()
-    code = f"SB:{encoded}"
+    entries = []
+    for id in ids:
+        cursor.execute("SELECT * FROM entries WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        if not row:
+            console.print(f"[red]No entry found with ID {id}[/red]")
+            conn.close()
+            return
+        id_, content, type_, language, tags, created_at, pinned = row
+        entries.append({
+            "content": content,
+            "type": type_,
+            "language": language,
+            "tags": tags
+        })
     conn.close()
-    console.print(f"[cyan]Share code:[/cyan]")
-    console.print(f"[green]{code}[/green]")
+
+    import requests
+    payload = {
+        "description": "second-brain-cli share",
+        "public": False,
+        "files": {
+            "brain_share.json": {
+                "content": json.dumps(entries, indent=2)
+            }
+        }
+    }
+    response = requests.post(
+        "https://api.github.com/gists",
+        json=payload,
+        headers={"Authorization": f"token {token}"}
+    )
+    if response.status_code == 201:
+        gist_id = response.json()["id"]
+        short_code = f"SB-{gist_id[:6].upper()}"
+        console.print(f"[cyan]Send this code to your friend:[/cyan]")
+        console.print(f"[green]{short_code}[/green]")
+        set_config(short_code, gist_id)
+    else:
+        console.print(f"[red]Failed to upload. Check your token.[/red]")
 
 @app.command()
-def importentry(
-    code: str = typer.Argument(..., help="Share code to import")
+def recv(
+    code: str = typer.Argument(..., help="Code received from friend")
 ):
     init_db()
-    if not code.startswith("SB:"):
-        console.print(f"[red]Invalid share code.[/red]")
+    config = get_config()
+    token = config.get("github_token")
+    if not token:
+        console.print("[red]GitHub token not set. Run: brain config --set github_token --value YOUR_TOKEN[/red]")
         return
-    try:
-        encoded = code[3:]
-        data = json.loads(base64.b64decode(encoded).decode())
-        conn = get_connection()
-        cursor = conn.cursor()
+
+    gist_id = config.get(code)
+    if not gist_id:
+        console.print(f"[red]Code not found. Make sure you received the correct code.[/red]")
+        return
+
+    import requests
+    response = requests.get(
+        f"https://api.github.com/gists/{gist_id}",
+        headers={"Authorization": f"token {token}"}
+    )
+    if response.status_code != 200:
+        console.print(f"[red]Failed to fetch. Check your token.[/red]")
+        return
+
+    content = response.json()["files"]["brain_share.json"]["content"]
+    entries = json.loads(content)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    for data in entries:
         cursor.execute(
             "INSERT INTO entries (content, type, language, tags, created_at, pinned) VALUES (?, ?, ?, ?, ?, ?)",
             (data["content"], data["type"], data.get("language"), data.get("tags"), datetime.now().isoformat(), 0)
         )
-        conn.commit()
-        conn.close()
-        console.print(f"[green]✓ Entry imported successfully![/green]")
-    except Exception as e:
-        console.print(f"[red]Failed to import: {e}[/red]")
+    conn.commit()
+    conn.close()
+    console.print(f"[green]✓ {len(entries)} entry(s) received and saved![/green]")
+
 
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
