@@ -1,3 +1,5 @@
+import base64
+import json
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -185,6 +187,56 @@ def copy(id: int = typer.Argument(..., help="ID of entry to copy to clipboard"))
     pyperclip.copy(row[0])
     conn.close()
     console.print(f"[green]✓ Copied to clipboard![/green]")
+
+@app.command()
+def share(
+    id: int = typer.Argument(..., help="ID of entry to share"),
+    offline: bool = typer.Option(True, "--offline", help="Generate offline share code")
+):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM entries WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        console.print(f"[red]No entry found with ID {id}[/red]")
+        conn.close()
+        return
+    id_, content, type_, language, tags, created_at, pinned = row
+    data = {
+        "content": content,
+        "type": type_,
+        "language": language,
+        "tags": tags
+    }
+    encoded = base64.b64encode(json.dumps(data).encode()).decode()
+    code = f"SB:{encoded}"
+    conn.close()
+    console.print(f"[cyan]Share code:[/cyan]")
+    console.print(f"[green]{code}[/green]")
+
+@app.command()
+def importentry(
+    code: str = typer.Argument(..., help="Share code to import")
+):
+    init_db()
+    if not code.startswith("SB:"):
+        console.print(f"[red]Invalid share code.[/red]")
+        return
+    try:
+        encoded = code[3:]
+        data = json.loads(base64.b64decode(encoded).decode())
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO entries (content, type, language, tags, created_at, pinned) VALUES (?, ?, ?, ?, ?, ?)",
+            (data["content"], data["type"], data.get("language"), data.get("tags"), datetime.now().isoformat(), 0)
+        )
+        conn.commit()
+        conn.close()
+        console.print(f"[green]✓ Entry imported successfully![/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to import: {e}[/red]")
 
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
