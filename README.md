@@ -1,82 +1,198 @@
-# 🧠 Second Brain CLI
+# 🧠 second-brain-cli
 
-A personal knowledge base for developers, entirely in the terminal.  
-Save notes, links, and code snippets — retrieve them in seconds.
+> Your memory, but searchable.  
+> A fast, minimal, terminal-first knowledge base for developers.
 
----
-
-## Why
-
-You constantly find useful things while coding, studying, or browsing.  
-You forget them. This tool fixes that — without leaving your terminal.
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 ---
 
-## Install
+## ✨ Why this exists
+
+You discover useful things while coding —  
+commands, fixes, links, ideas.
+
+Then you forget them.
+
+**second-brain-cli makes sure you don’t.**
+
+No browser. No clutter. Just your terminal.
+
+---
+
+## ⚡ Features
+
+- 📝 Notes, links, and code snippets
+- 🔍 Fuzzy search with scoring
+- 🏷️ Tag-based filtering
+- 📌 Pin important entries
+- 📋 Copy to clipboard instantly
+- 📅 Filter by date (`--today`)
+- 📤 Export to Markdown / JSON
+- 🤝 Share via GitHub Gist (short codes)
+- 🔒 100% offline-first (SQLite)
+- ⚡ Fast, minimal CLI experience
+
+---
+
+## 📦 Installation
 
 ```bash
-git clone https://github.com/abhijnyan-codes/second-brain-cli
-cd second-brain-cli
-pip install -e .
+pip install second-brain-cli
 ```
 
-## Usage
+---
+
+## 🚀 Quick Start
 
 ```bash
 # Add a note
-brain add "always use debounce on search inputs" --tag js,frontend
+brain add "use debounce for search inputs" --tag js,frontend
 
 # Add a link
-brain add "https://github.com/charmbracelet/bubbletea" --tag go,tui
+brain add "https://github.com/charmbracelet/bubbletea" --tag go,tui --type link
 
 # Add a snippet
-brain add "git reset --hard HEAD~1" --type snippet --tag git
+brain add "git reset --hard HEAD~1" --tag git --type snippet
 
-# List all entries
-brain list-all
+# Quick add
+brain say "revise binary search"
 
-# Search by keyword
+# Search
 brain search "debounce"
-
-# Search by tag
 brain search --tag git
 
-# Search today's entries
-brain search --today
-
-# Delete an entry
-brain delete 1
+# View
+brain list-all
+brain today
 ```
 
 ---
 
-## Features
+## 🧩 Commands
 
-- Save notes, links, snippets
-- Tag everything
-- Fuzzy keyword search
-- Filter by tag, type, date
-- Fully offline — stored in `~/.second-brain/brain.db`
-- No cloud, no account, no tracking
+### Add
+```bash
+brain add "content" --tag tags --type note|link|snippet --lang python
+brain say "content"
+```
+
+### Retrieve
+```bash
+brain list-all
+brain search "keyword" --tag tag --type note --today
+brain today
+```
+
+### Manage
+```bash
+brain edit <id>
+brain delete <id>
+brain pin <id>
+brain copy <id>
+```
+
+### Export
+```bash
+brain export --format markdown
+brain export --format json
+```
+
+### Share
+```bash
+brain send <id1> <id2>
+brain recv <code>
+```
 
 ---
 
-## Roadmap
+## 🔐 Setup (for sharing)
 
-- [ ] `brain edit <id>` — edit entry in $EDITOR
-- [ ] `brain export` — export to markdown/json
-- [ ] `brain today` — show today's entries
-- [ ] fzf interactive search
+```bash
+# Create GitHub token (gist scope)
+https://github.com/settings/tokens
+
+brain config --set github_token --value YOUR_TOKEN
+```
+
+---
+
+## 🗂️ Storage
+
+All data is stored locally:
+
+```
+~/.second-brain/brain.db
+~/.second-brain/config.json
+~/.second-brain/export.md
+~/.second-brain/export.json
+```
+
+- SQLite database
+- No cloud
+- No tracking
+- Full privacy
+
+---
+
+## 🧠 Philosophy
+
+- Terminal-first
+- Zero friction
+- Developer-focused
+- Privacy by default
+
+---
+
+## 🛣️ Roadmap
+
+- [ ] `brain tui` — full terminal UI (Textual)
+- [ ] `brain show <id>`
 - [ ] Shell autocomplete
+- [ ] Browser extension
+- [ ] fzf interactive search
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-PRs welcome. Open an issue first for big changes.
+Contributions are welcome!
+
+```bash
+# 1. Fork
+# 2. Create branch
+git checkout -b feat/your-feature
+
+# 3. Commit
+git commit -m "feat: your feature"
+
+# 4. Push
+git push origin feat/your-feature
+```
+
+Then open a Pull Request 🚀
 
 ---
 
-## License
+## ⭐ Support
 
-MIT
+If you find this useful:
+- Star the repo ⭐
+- Share it with friends
+- Suggest features
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and distribute.
+
+---
+
+## 🔗 Links
+
+- PyPI: https://pypi.org/project/second-brain-cli/
+- GitHub: https://github.com/abhijnyan-codes/second-brain-cli
