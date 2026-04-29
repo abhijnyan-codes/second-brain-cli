@@ -3,3 +3,5 @@ rich
 rapidfuzz
 pyperclip
 requests
+SpeechRecognition
+pyaudio

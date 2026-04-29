@@ -5,12 +5,14 @@ setup(
     version="0.2.2",
     packages=find_packages(),
     install_requires=[
-    "typer",
-    "rich",
-    "rapidfuzz",
-    "pyperclip",
-    "requests",
-],
+        "typer",
+        "rich",
+        "rapidfuzz",
+        "pyperclip",
+        "requests",
+        "SpeechRecognition",
+        "pyaudio",
+    ],
     entry_points={
         "console_scripts": [
             "brain=brain.cli:app",

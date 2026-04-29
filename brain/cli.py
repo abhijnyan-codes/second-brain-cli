@@ -51,6 +51,180 @@ def say(
     console.print(f"[green]✓ Saved![/green]")
 
 @app.command()
+def voice(
+    tag: str = typer.Option(None, "--tag", "-t", help="Tag for the voice note")
+):
+    import speech_recognition as sr
+    import os
+    recognizer = sr.Recognizer()
+
+    fmt = typer.prompt("Save as? (text/audio/both)", default="both")
+
+    console.print("[cyan]🎤 Listening... say 'stop' to finish[/cyan]")
+    full_text = []
+    audio_chunks = []
+
+    mic_index = sr.Microphone.list_microphone_names().index("Microphone Array (Senary Audio)")
+    with sr.Microphone(device_index=mic_index) as source:
+        recognizer.adjust_for_ambient_noise(source, duration=1)
+        while True:
+            try:
+                audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                audio_chunks.append(audio)
+                try:
+                    text = recognizer.recognize_google(audio)
+                    if "stop" in text.lower():
+                        text = text.lower().replace("stop", "").strip()
+                        if text:
+                            full_text.append(text)
+                        break
+                    full_text.append(text)
+                    console.print(f"[dim]+ {text}[/dim]")
+                except sr.UnknownValueError:
+                    continue
+            except sr.WaitTimeoutError:
+                break
+            except sr.RequestError:
+                console.print("[red]Network error.[/red]")
+                break
+
+    if not full_text and not audio_chunks:
+        console.print("[yellow]Nothing captured.[/yellow]")
+        return
+
+    final_text = " ".join(full_text) if full_text else "voice note"
+
+    if fmt in ("text", "both"):
+        console.print(f"\n[cyan]Heard:[/cyan] {final_text}")
+        confirm = typer.confirm("Save this?")
+        if not confirm:
+            console.print("[yellow]Discarded.[/yellow]")
+            return
+
+    filepath = None
+    if fmt in ("audio", "both"):
+        audio_dir = os.path.join(os.path.expanduser("~"), ".second-brain", "audio")
+        os.makedirs(audio_dir, exist_ok=True)
+        filename = f"voice_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+        filepath = os.path.join(audio_dir, filename)
+
+        combined = audio_chunks[0]
+        for chunk in audio_chunks[1:]:
+            combined = sr.AudioData(
+                combined.get_raw_data() + chunk.get_raw_data(),
+                combined.sample_rate,
+                combined.sample_width
+            )
+        with open(filepath, "wb") as f:
+            f.write(combined.get_wav_data())
+        console.print(f"[green]✓ Audio saved to {filepath}[/green]")
+
+    if fmt == "text":
+        content = final_text
+    elif fmt == "audio":
+        content = f"[audio:{filepath}]"
+    else:
+        content = f"{final_text} [audio:{filepath}]"
+
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO entries (content, type, language, tags, created_at, pinned) VALUES (?, ?, ?, ?, ?, ?)",
+        (content, "voice", None, tag, datetime.now().isoformat(), 0)
+    )
+    conn.commit()
+    conn.close()
+    console.print(f"[green]✓ Saved![/green]")
+
+@app.command()
+def listen():
+    import speech_recognition as sr
+    import subprocess
+    recognizer = sr.Recognizer()
+    console.print("[cyan]👂 Listening for 'hey brain'... (say 'hey brain stop' to exit)[/cyan]")
+
+    def handle_command(command):
+        command = command.lower().strip()
+        if "list all" in command or "list-all" in command:
+            from brain.search import search_entries
+            rows = search_entries()
+            if not rows:
+                console.print("[yellow]No entries found.[/yellow]")
+            else:
+                _print_table(rows)
+        elif command.startswith("add "):
+            content = command[4:].strip()
+            init_db()
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO entries (content, type, language, tags, created_at, pinned) VALUES (?, ?, ?, ?, ?, ?)",
+                (content, "note", None, None, datetime.now().isoformat(), 0)
+            )
+            conn.commit()
+            conn.close()
+            console.print(f"[green]✓ Saved: {content}[/green]")
+        elif command.startswith("search "):
+            keyword = command[7:].strip()
+            from brain.search import search_entries
+            rows = search_entries(keyword=keyword)
+            if not rows:
+                console.print("[yellow]No results found.[/yellow]")
+            else:
+                _print_table(rows)
+        elif command.startswith("delete "):
+            try:
+                id_ = int(command[7:].strip())
+                init_db()
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM entries WHERE id = ?", (id_,))
+                conn.commit()
+                conn.close()
+                console.print(f"[red]Deleted entry {id_}[/red]")
+            except:
+                console.print("[red]Invalid ID.[/red]")
+        elif "today" in command:
+            from brain.search import search_entries
+            rows = search_entries(today=True)
+            if not rows:
+                console.print("[yellow]No entries today.[/yellow]")
+            else:
+                _print_table(rows)
+        else:
+            console.print(f"[yellow]Unknown command: {command}[/yellow]")
+
+    mic_index = sr.Microphone.list_microphone_names().index("Microphone Array (Senary Audio)")
+    with sr.Microphone(device_index=mic_index) as source:
+        recognizer.adjust_for_ambient_noise(source, duration=1)
+        while True:
+            try:
+                audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
+                text = recognizer.recognize_google(audio).lower()
+                console.print(f"[dim]Heard: {text}[/dim]")
+
+                if "hey brain stop" in text:
+                    console.print("[red]👂 Stopped listening.[/red]")
+                    break
+
+                if "hey brain" in text:
+                    command = text.replace("hey brain", "").strip()
+                    console.print(f"[cyan]🟢 Command: {command}[/cyan]")
+                    if command:
+                        handle_command(command)
+                    else:
+                        console.print("[yellow]No command detected after 'hey brain'[/yellow]")
+
+            except sr.WaitTimeoutError:
+                continue
+            except sr.UnknownValueError:
+                continue
+            except sr.RequestError:
+                console.print("[red]Network error.[/red]")
+                break
+
+@app.command()
 def list_all():
     init_db()
     rows = search_entries()
@@ -314,6 +488,20 @@ def recv(
     conn.close()
     console.print(f"[green]✓ {len(entries)} entry(s) received and saved![/green]")
 
+
+@app.command()
+def show(id: int = typer.Argument(..., help="ID of entry to show")):
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT content FROM entries WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        console.print(f"[red]No entry found with ID {id}[/red]")
+        conn.close()
+        return
+    conn.close()
+    console.print(row[0])
 
 def _print_table(rows):
     table = Table(show_header=True, header_style="bold cyan")
